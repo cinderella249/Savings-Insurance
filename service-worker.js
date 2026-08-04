@@ -1,4 +1,4 @@
-const CACHE_NAME = 'savings-passbook-v1';
+const CACHE_NAME = 'savings-passbook-v2';
 const CORE_ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (event) => {
