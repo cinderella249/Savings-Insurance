@@ -1,0 +1,26 @@
+{
+  "name": "儲蓄倒數帳本",
+  "short_name": "儲蓄倒數",
+  "description": "追蹤儲蓄險繳費進度，倒數還需繳幾年、計算總繳金額",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#1C2B4A",
+  "theme_color": "#1C2B4A",
+  "lang": "zh-TW",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

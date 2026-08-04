@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#1C2B4A"/>
+
+  <!-- 豬耳 -->
+  <ellipse cx="180" cy="188" rx="26" ry="30" fill="#B08D57" transform="rotate(-25 180 188)"/>
+  <ellipse cx="332" cy="188" rx="26" ry="30" fill="#B08D57" transform="rotate(25 332 188)"/>
+
+  <!-- 豬身 -->
+  <ellipse cx="256" cy="300" rx="128" ry="102" fill="#D8BD8E"/>
+
+  <!-- 豬腳 -->
+  <rect x="176" y="372" width="26" height="34" rx="8" fill="#B08D57"/>
+  <rect x="310" y="372" width="26" height="34" rx="8" fill="#B08D57"/>
+
+  <!-- 豬尾巴 -->
+  <path d="M384 268 q 26 -8 20 18 q -6 20 -26 12" fill="none" stroke="#B08D57" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- 投幣孔 -->
+  <rect x="222" y="212" width="68" height="14" rx="7" fill="#1C2B4A"/>
+
+  <!-- 豬鼻 -->
+  <ellipse cx="256" cy="316" rx="38" ry="26" fill="#B08D57"/>
+  <ellipse cx="242" cy="316" rx="6" ry="9" fill="#1C2B4A"/>
+  <ellipse cx="270" cy="316" rx="6" ry="9" fill="#1C2B4A"/>
+
+  <!-- 眼睛 -->
+  <circle cx="212" cy="268" r="8" fill="#1C2B4A"/>
+  <circle cx="300" cy="268" r="8" fill="#1C2B4A"/>
+
+  <!-- 金幣 -->
+  <circle cx="256" cy="150" r="34" fill="#F5F0E3" stroke="#B08D57" stroke-width="6"/>
+  <text x="256" y="160" text-anchor="middle" font-family="serif" font-size="30" font-weight="700" fill="#1C2B4A">$</text>
+</svg>
