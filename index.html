@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>儲蓄倒數帳本</title>
+<meta name="theme-color" content="#1C2B4A">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
+<style>
+  :root{
+    --ink-navy:#1C2B4A;
+    --ink-navy-2:#243458;
+    --cream:#F5F0E3;
+    --cream-2:#EFE8D6;
+    --sage:#7C9885;
+    --brass:#B08D57;
+    --brass-light:#D8BD8E;
+    --stamp:#A13D3D;
+    --charcoal:#2B2B28;
+    --line: rgba(43,43,40,0.14);
+    --serif: "Noto Serif TC","Songti TC","Times New Roman",serif;
+    --sans: "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    --mono: "SF Mono","Roboto Mono","Courier New",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--charcoal);
+    font-family:var(--sans);
+    min-height:100vh;
+    padding-bottom:48px;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image: repeating-linear-gradient(
+      to bottom, transparent 0 39px, var(--line) 39px 40px
+    );
+    pointer-events:none;
+    opacity:0.5;
+  }
+  header{
+    background:var(--ink-navy);
+    color:var(--brass-light);
+    padding:28px 20px 22px;
+    position:relative;
+    box-shadow:0 6px 14px rgba(28,43,74,0.25);
+  }
+  header::after{
+    content:"";
+    position:absolute; left:0; right:0; bottom:0; height:4px;
+    background:linear-gradient(90deg,var(--brass),transparent 70%);
+  }
+  .brand{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    max-width:720px; margin:0 auto;
+  }
+  .brand h1{
+    font-family:var(--serif);
+    font-weight:700;
+    font-size:1.5rem;
+    color:var(--cream);
+    margin:0;
+    letter-spacing:0.04em;
+  }
+  .brand .eyebrow{
+    font-family:var(--mono);
+    font-size:0.68rem;
+    letter-spacing:0.18em;
+    color:var(--brass);
+    text-transform:uppercase;
+    display:block;
+    margin-bottom:4px;
+  }
+  .brand-actions{display:flex; gap:8px;}
+  .icon-btn{
+    width:40px; height:40px;
+    border-radius:50%;
+    border:1px solid rgba(216,189,142,0.5);
+    background:rgba(245,240,227,0.06);
+    color:var(--brass-light);
+    font-size:1.1rem;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .icon-btn:hover{background:rgba(216,189,142,0.16);}
+  main{max-width:720px; margin:0 auto; padding:20px 16px 0;}
+  .summary-strip{
+    display:grid; grid-template-columns:repeat(3,1fr);
+    gap:10px; margin-bottom:20px;
+  }
+  .summary-cell{
+    background:var(--cream-2);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:10px 12px;
+    text-align:center;
+  }
+  .summary-cell .label{font-size:0.68rem; color:var(--sage); letter-spacing:0.08em;}
+  .summary-cell .value{
+    font-family:var(--mono); font-variant-numeric:tabular-nums;
+    font-size:1.05rem; font-weight:700; color:var(--ink-navy); margin-top:2px;
+  }
+  .empty-state{
+    text-align:center; padding:60px 20px; color:var(--sage);
+    border:1px dashed var(--line); border-radius:8px; background:var(--cream-2);
+  }
+  .empty-state h2{font-family:var(--serif); color:var(--ink-navy); font-size:1.15rem; margin-bottom:6px;}
+  .policy-card{
+    background:#FFFFFC;
+    border:1px solid var(--line);
+    border-left:5px solid var(--ink-navy);
+    border-radius:8px;
+    margin-bottom:16px;
+    padding:16px;
+    position:relative;
+    box-shadow:0 2px 4px rgba(43,43,40,0.05);
+  }
+  .policy-card.due-soon{border-left-color:var(--stamp);}
+  .due-badge{
+    position:absolute; top:14px; right:14px;
+    font-family:var(--mono); font-size:0.65rem; letter-spacing:0.06em;
+    color:var(--stamp); border:1px solid var(--stamp); border-radius:20px;
+    padding:2px 9px; transform:rotate(3deg);
+  }
+  .card-top{display:flex; gap:14px; align-items:flex-start;}
+  .rings{flex:0 0 auto;}
+  .card-info{flex:1; min-width:0;}
+  .card-info h3{
+    font-family:var(--serif); font-size:1.08rem; margin:0 0 2px; color:var(--ink-navy);
+    padding-right:60px;
+  }
+  .card-info .sub{font-size:0.75rem; color:var(--sage); margin-bottom:8px;}
+  .stat-row{display:flex; flex-wrap:wrap; gap:6px 18px; font-size:0.8rem; margin-bottom:4px;}
+  .stat-row .k{color:var(--sage);}
+  .stat-row .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:700; color:var(--charcoal);}
+  .progress-track{
+    margin-top:12px; height:6px; border-radius:3px; background:var(--cream-2);
+    overflow:hidden; border:1px solid var(--line);
+  }
+  .progress-fill{height:100%; background:linear-gradient(90deg,var(--brass),var(--brass-light));}
+  .card-actions{
+    display:flex; gap:8px; margin-top:12px; padding-top:12px;
+    border-top:1px dashed var(--line); font-size:0.78rem;
+  }
+  .card-actions button{
+    background:none; border:1px solid var(--line); color:var(--ink-navy);
+    padding:5px 12px; border-radius:5px; cursor:pointer; font-family:var(--sans);
+  }
+  .card-actions button:hover{background:var(--cream-2);}
+  .card-actions .danger{color:var(--stamp); border-color:rgba(161,61,61,0.4);}
+  .schedule-wrap{margin-top:12px; max-height:0; overflow:hidden; transition:max-height 0.25s ease;}
+  .schedule-wrap.open{max-height:420px; overflow-y:auto;}
+  .schedule-table{width:100%; border-collapse:collapse; font-size:0.78rem;}
+  .schedule-table th{
+    text-align:left; font-weight:600; color:var(--sage); padding:6px 8px;
+    border-bottom:1px solid var(--line); position:sticky; top:0; background:#FFFFFC;
+  }
+  .schedule-table td{padding:6px 8px; border-bottom:1px dotted var(--line); font-family:var(--mono); font-variant-numeric:tabular-nums;}
+  .schedule-table tr.paid td{color:var(--sage);}
+  .schedule-table tr.next td{color:var(--stamp); font-weight:700;}
+  .fab{
+    position:fixed; right:20px; bottom:24px;
+    width:56px; height:56px; border-radius:50%;
+    background:var(--ink-navy); color:var(--brass-light);
+    border:none; font-size:1.6rem; box-shadow:0 6px 16px rgba(28,43,74,0.35);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .fab:hover{background:var(--ink-navy-2);}
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(28,43,74,0.45);
+    display:none; align-items:flex-end; justify-content:center; z-index:50;
+  }
+  .modal-overlay.open{display:flex;}
+  @media(min-width:640px){.modal-overlay{align-items:center;}}
+  .modal{
+    background:var(--cream); width:100%; max-width:480px;
+    border-radius:14px 14px 0 0; padding:22px 20px 26px;
+    max-height:88vh; overflow-y:auto;
+  }
+  @media(min-width:640px){.modal{border-radius:12px;}}
+  .modal h2{font-family:var(--serif); color:var(--ink-navy); margin:0 0 16px; font-size:1.2rem;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:0.78rem; color:var(--sage); margin-bottom:5px; letter-spacing:0.03em;}
+  .field input, .field select{
+    width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:6px;
+    font-family:var(--sans); font-size:0.92rem; background:#FFFFFC; color:var(--charcoal);
+  }
+  .field input:focus, .field select:focus{outline:2px solid var(--brass); outline-offset:1px;}
+  .field-row{display:flex; gap:10px;}
+  .field-row .field{flex:1;}
+  .modal-actions{display:flex; gap:10px; margin-top:18px;}
+  .btn-primary{
+    flex:1; background:var(--ink-navy); color:var(--cream); border:none;
+    padding:11px; border-radius:7px; font-size:0.92rem; cursor:pointer; font-weight:600;
+  }
+  .btn-secondary{
+    background:none; border:1px solid var(--line); color:var(--charcoal);
+    padding:11px 16px; border-radius:7px; cursor:pointer; font-size:0.92rem;
+  }
+  .hint{font-size:0.72rem; color:var(--sage); margin-top:-8px; margin-bottom:14px; line-height:1.5;}
+  .settings-section{margin-bottom:20px;}
+  .settings-section h3{font-family:var(--serif); font-size:0.95rem; color:var(--ink-navy); margin:0 0 8px;}
+  .settings-section .desc{font-size:0.76rem; color:var(--sage); margin-bottom:10px; line-height:1.6;}
+  .settings-btns{display:flex; gap:8px; flex-wrap:wrap;}
+  .settings-btns button{
+    background:var(--cream-2); border:1px solid var(--line); color:var(--ink-navy);
+    padding:8px 12px; border-radius:6px; font-size:0.8rem; cursor:pointer;
+  }
+  .stepper{display:flex; align-items:center; gap:10px;}
+  .stepper button{
+    width:32px; height:32px; border-radius:6px; border:1px solid var(--line);
+    background:var(--cream-2); font-size:1rem; cursor:pointer; color:var(--ink-navy);
+  }
+  .stepper span{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:1rem; min-width:32px; text-align:center;}
+  #toast{
+    position:fixed; bottom:92px; left:50%; transform:translateX(-50%) translateY(10px);
+    background:var(--ink-navy); color:var(--cream); padding:9px 18px; border-radius:20px;
+    font-size:0.8rem; opacity:0; transition:all 0.25s; pointer-events:none; z-index:60;
+    white-space:nowrap;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div>
+      <span class="eyebrow">Savings Passbook</span>
+      <h1>儲蓄倒數帳本</h1>
+    </div>
+    <div class="brand-actions">
+      <button class="icon-btn" id="btnSettings" title="設定" aria-label="設定">⚙</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="summary-strip" id="summaryStrip"></div>
+  <div id="policyList"></div>
+  <div class="empty-state" id="emptyState" style="display:none;">
+    <h2>還沒有任何保單</h2>
+    <p>點右下角「＋」新增第一張儲蓄險，開始倒數。</p>
+  </div>
+</main>
+
+<button class="fab" id="btnAdd" title="新增保單" aria-label="新增保單">＋</button>
+
+<!-- 新增/編輯 Modal -->
+<div class="modal-overlay" id="policyModalOverlay">
+  <div class="modal">
+    <h2 id="policyModalTitle">新增保單</h2>
+    <form id="policyForm">
+      <div class="field">
+        <label for="f_name">保單名稱／代號</label>
+        <input type="text" id="f_name" placeholder="例：南山六年還本" required>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="f_start">起繳日期（第一期）</label>
+          <input type="date" id="f_start" required>
+        </div>
+        <div class="field">
+          <label for="f_freq">繳費頻率</label>
+          <select id="f_freq">
+            <option value="annual">年繳</option>
+            <option value="semi">半年繳</option>
+            <option value="quarter">季繳</option>
+            <option value="month">月繳</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="f_premium">每期保費（元）</label>
+          <input type="number" id="f_premium" min="0" step="1" required>
+        </div>
+        <div class="field">
+          <label for="f_years">繳費年期（共幾年）</label>
+          <input type="number" id="f_years" min="1" step="1" required>
+        </div>
+      </div>
+      <div class="field">
+        <label>已繳期數</label>
+        <div class="stepper">
+          <button type="button" id="paidMinus">－</button>
+          <span id="paidCountDisplay">0</span>
+          <button type="button" id="paidPlus">＋</button>
+          <span style="font-size:0.75rem;color:var(--sage);" id="paidOfTotal">／共 0 期</span>
+        </div>
+      </div>
+      <p class="hint">系統會依起繳日期自動抓出到今天約繳了幾期，你可以再手動微調（例如有提前或延後繳費的情況）。</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="policyCancel">取消</button>
+        <button type="submit" class="btn-primary">儲存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 設定 Modal -->
+<div class="modal-overlay" id="settingsModalOverlay">
+  <div class="modal">
+    <h2>設定</h2>
+    <div class="settings-section">
+      <h3>Google Sheet 同步</h3>
+      <div class="desc">保單資料現在以 Google Sheet 為主要來源。請先在 Apps Script 部署「Web App」，把網址和你設定的密鑰貼在這裡儲存。之後每次開啟、新增、編輯、刪除保單都會直接讀寫這個 Sheet，沒有網路就無法讀取資料。</div>
+      <div class="field">
+        <label for="f_apiUrl">Apps Script Web App 網址</label>
+        <input type="url" id="f_apiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <div class="field">
+        <label for="f_apiKey">密鑰（跟 Code.gs 裡的 SECRET_KEY 要一致）</label>
+        <input type="text" id="f_apiKey" placeholder="你設定的密鑰字串">
+      </div>
+      <button type="button" class="btn-primary" id="btnSaveApiUrl">儲存並重新連線</button>
+      <div id="apiStatus" style="font-size:0.75rem;color:var(--sage);margin-top:8px;"></div>
+    </div>
+    <div class="settings-section">
+      <h3>到期繳費提醒</h3>
+      <div class="desc">開啟通知後，每次打開這個 App 都會檢查是否有保單即將到期，若在提醒天數內會跳出瀏覽器通知。由於通知是在打開 App 當下才檢查，無法保證完全沒打開 App 也收到通知，建議偶爾打開一下確認進度。</div>
+      <div class="field">
+        <label for="f_reminderDays">提前幾天提醒</label>
+        <input type="number" id="f_reminderDays" min="1" max="60" step="1" value="7">
+      </div>
+      <button type="button" class="btn-primary" id="btnEnableNotif" style="margin-top:4px;">啟用瀏覽器通知</button>
+      <div id="notifStatus" style="font-size:0.75rem;color:var(--sage);margin-top:8px;"></div>
+    </div>
+    <div class="settings-section">
+      <h3>本機備份（選用）</h3>
+      <div class="desc">Sheet 才是正式資料來源，這裡的匯出只是額外存一份 JSON 在電腦裡防萬一；匯入會整批覆蓋 Sheet 上的資料，請小心使用。</div>
+      <div class="settings-btns">
+        <button type="button" id="btnExport">匯出目前資料（JSON）</button>
+        <button type="button" id="btnImport">匯入並覆蓋 Sheet</button>
+        <input type="file" id="fileImport" accept="application/json" style="display:none;">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-primary" id="settingsClose">關閉</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  const FREQ = {
+    annual:  { label:'年繳', months:12, perYear:1 },
+    semi:    { label:'半年繳', months:6,  perYear:2 },
+    quarter: { label:'季繳', months:3,  perYear:4 },
+    month:   { label:'月繳', months:1,  perYear:12 }
+  };
+
+  const API_URL_KEY = 'savingsPassbook.apiUrl.v1'; // 只存網址設定，不存保單資料
+  const API_KEY_KEY = 'savingsPassbook.apiKey.v1'; // 密鑰
+  const LOCAL_SETTINGS_KEY = 'savingsPassbook.localSettings.v1'; // reminderDays 等本機偏好
+
+  let policies = [];
+  let settings = { reminderDays: 7 };
+  let editingId = null;
+  let openScheduleId = null;
+  let apiUrl = localStorage.getItem(API_URL_KEY) || 'https://script.google.com/macros/s/AKfycbwg8xGJLInkA-QmBe1_EoqmSCcWeqYAkZOYZEhZIZAPADVkHuY6FU-LymBW8MIXW-m-/exec';
+  let apiKey = localStorage.getItem(API_KEY_KEY) || '';
+  let isSyncing = false;
+
+  function loadLocalSettings(){
+    try { return Object.assign({ reminderDays:7 }, JSON.parse(localStorage.getItem(LOCAL_SETTINGS_KEY)) || {}); }
+    catch(e){ return { reminderDays:7 }; }
+  }
+  function saveLocalSettings(){
+    localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify({ reminderDays: settings.reminderDays }));
+  }
+  settings = loadLocalSettings();
+
+  // ---- Google Sheet API 連線層 ----
+  // 注意：呼叫 Apps Script Web App 時故意不設定 Content-Type: application/json，
+  // 讓瀏覽器用預設的 text/plain 送出，避免觸發 CORS 預檢（Apps Script 不支援 OPTIONS）。
+  // Apps Script 那邊要用 e.postData.contents 自己 JSON.parse。
+  function apiGet(action){
+    if (!apiUrl) return Promise.reject(new Error('尚未設定 Apps Script 網址'));
+    const url = apiUrl + (apiUrl.includes('?') ? '&' : '?') + 'action=' + encodeURIComponent(action) + '&key=' + encodeURIComponent(apiKey);
+    return fetch(url).then(r=>{
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(data=>{
+      if (data && data.error) throw new Error(data.error);
+      return data;
+    });
+  }
+  function apiPost(payload){
+    if (!apiUrl) return Promise.reject(new Error('尚未設定 Apps Script 網址'));
+    const body = Object.assign({ key: apiKey }, payload);
+    return fetch(apiUrl, { method:'POST', body: JSON.stringify(body) }).then(r=>{
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(data=>{
+      if (data && data.error) throw new Error(data.error);
+      return data;
+    });
+  }
+
+  function setApiStatus(msg, isError){
+    const el = document.getElementById('apiStatus');
+    if (el){ el.textContent = msg; el.style.color = isError ? 'var(--stamp)' : 'var(--sage)'; }
+  }
+
+  function syncFromSheet(){
+    if (!apiUrl){
+      setApiStatus('尚未設定 Apps Script 網址，請貼上後儲存。', true);
+      renderList();
+      return Promise.resolve();
+    }
+    isSyncing = true;
+    renderList();
+    return apiGet('list').then(data=>{
+      policies = data.policies || [];
+      if (data.settings && typeof data.settings.reminderDays === 'number'){
+        settings.reminderDays = data.settings.reminderDays;
+        saveLocalSettings();
+      }
+      setApiStatus('已連線，資料同步時間 ' + new Date().toLocaleTimeString('zh-TW'));
+    }).catch(err=>{
+      setApiStatus('連線失敗：' + err.message, true);
+      toast('無法連上 Google Sheet，請檢查網址或網路');
+    }).finally(()=>{
+      isSyncing = false;
+      renderList();
+    });
+  }
+
+  function uid(){ return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  function addMonths(date, n){
+    const d = new Date(date);
+    const day = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + n);
+    const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+    d.setDate(Math.min(day, lastDay));
+    return d;
+  }
+
+  function buildSchedule(policy){
+    const f = FREQ[policy.frequency];
+    const total = policy.totalYears * f.perYear;
+    const start = new Date(policy.startDate + 'T00:00:00');
+    const dates = [];
+    for (let i=0;i<total;i++){
+      dates.push(addMonths(start, i*f.months));
+    }
+    return dates;
+  }
+
+  function fmtDate(d){
+    return d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0');
+  }
+  function fmtMoney(n){
+    return '$' + Math.round(n).toLocaleString('zh-TW');
+  }
+  function daysBetween(a,b){
+    const MS=86400000;
+    const A=new Date(a.getFullYear(),a.getMonth(),a.getDate());
+    const B=new Date(b.getFullYear(),b.getMonth(),b.getDate());
+    return Math.round((B-A)/MS);
+  }
+
+  function computeDefaultPaidCount(policy){
+    const f = FREQ[policy.frequency];
+    const total = policy.totalYears * f.perYear;
+    const schedule = buildSchedule(policy);
+    const today = new Date();
+    let count = 0;
+    for (let i=0;i<schedule.length;i++){
+      if (schedule[i] <= today) count = i+1;
+    }
+    return Math.min(count, total);
+  }
+
+  function policyStats(policy){
+    const f = FREQ[policy.frequency];
+    const total = policy.totalYears * f.perYear;
+    const schedule = buildSchedule(policy);
+    const paid = Math.min(policy.paidCount, total);
+    const remainingCount = total - paid;
+    const remainingYears = remainingCount / f.perYear;
+    const totalAmount = policy.premium * total;
+    const paidAmount = policy.premium * paid;
+    const remainingAmount = totalAmount - paidAmount;
+    const nextDate = paid < total ? schedule[paid] : null;
+    const daysUntilNext = nextDate ? daysBetween(new Date(), nextDate) : null;
+    const progressPct = total>0 ? (paid/total*100) : 0;
+    const done = paid >= total;
+    return { f, total, schedule, paid, remainingCount, remainingYears, totalAmount, paidAmount, remainingAmount, nextDate, daysUntilNext, progressPct, done };
+  }
+
+  function ringsSVG(policy, stats){
+    const size = 88, cx = size/2, cy = size/2;
+    const ringCount = Math.min(policy.totalYears, 24);
+    const maxR = size/2 - 6;
+    const minR = 14;
+    const step = ringCount>1 ? (maxR-minR)/(ringCount-1) : 0;
+    let circles = '';
+    for (let y=0; y<ringCount; y++){
+      const r = minR + step*y;
+      const yearPaidThreshold = (y+1) * stats.f.perYear;
+      const filled = stats.paid >= yearPaidThreshold;
+      const inProgress = !filled && stats.paid > y*stats.f.perYear;
+      const stroke = filled ? 'var(--brass)' : (inProgress ? 'var(--sage)' : 'var(--line)');
+      const dash = inProgress ? 'stroke-dasharray="3,3"' : '';
+      const width = filled ? 2.4 : 1.4;
+      circles += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${stroke}" stroke-width="${width}" ${dash}/>`;
+    }
+    const centerLabel = stats.done ? '完' : Math.ceil(stats.remainingYears);
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      ${circles}
+      <text x="${cx}" y="${cy+5}" text-anchor="middle" font-family="var(--serif)" font-size="18" font-weight="700" fill="var(--ink-navy)">${centerLabel}</text>
+      <text x="${cx}" y="${cy+17}" text-anchor="middle" font-family="var(--mono)" font-size="8" fill="var(--sage)">${stats.done?'':'年'}</text>
+    </svg>`;
+  }
+
+  function renderSummary(){
+    const strip = document.getElementById('summaryStrip');
+    if (policies.length === 0){ strip.innerHTML=''; return; }
+    let totalRemaining = 0, totalPaidAmt = 0, nearest = null;
+    policies.forEach(p=>{
+      const s = policyStats(p);
+      totalRemaining += s.remainingAmount;
+      totalPaidAmt += s.paidAmount;
+      if (s.daysUntilNext !== null && (nearest===null || s.daysUntilNext < nearest)) nearest = s.daysUntilNext;
+    });
+    strip.innerHTML = `
+      <div class="summary-cell"><div class="label">已累積繳納</div><div class="value">${fmtMoney(totalPaidAmt)}</div></div>
+      <div class="summary-cell"><div class="label">尚須繳納</div><div class="value">${fmtMoney(totalRemaining)}</div></div>
+      <div class="summary-cell"><div class="label">最近繳費倒數</div><div class="value">${nearest===null?'—':nearest+' 天'}</div></div>
+    `;
+  }
+
+  function renderList(){
+    const list = document.getElementById('policyList');
+    const empty = document.getElementById('emptyState');
+    if (!apiUrl){
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      empty.innerHTML = '<h2>尚未連接 Google Sheet</h2><p>請點右上角「⚙ 設定」貼上 Apps Script Web App 網址。</p>';
+      document.getElementById('summaryStrip').innerHTML = '';
+      return;
+    }
+    if (isSyncing && policies.length === 0){
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      empty.innerHTML = '<h2>連線中…</h2><p>正在從 Google Sheet 讀取保單資料。</p>';
+      document.getElementById('summaryStrip').innerHTML = '';
+      return;
+    }
+    if (policies.length === 0){
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      empty.innerHTML = '<h2>還沒有任何保單</h2><p>點右下角「＋」新增第一張儲蓄險，開始倒數。</p>';
+      renderSummary();
+      return;
+    }
+    empty.style.display = 'none';
+
+    const sorted = [...policies].sort((a,b)=>{
+      const sa = policyStats(a), sb = policyStats(b);
+      const da = sa.daysUntilNext===null? Infinity : sa.daysUntilNext;
+      const db = sb.daysUntilNext===null? Infinity : sb.daysUntilNext;
+      return da-db;
+    });
+
+    list.innerHTML = sorted.map(p=>{
+      const s = policyStats(p);
+      const dueSoon = s.daysUntilNext!==null && s.daysUntilNext <= settings.reminderDays;
+      const scheduleOpen = openScheduleId === p.id;
+      const scheduleRows = s.schedule.map((d,i)=>{
+        const isPaid = i < s.paid;
+        const isNext = i === s.paid;
+        return `<tr class="${isPaid?'paid':''} ${isNext?'next':''}">
+          <td>第 ${i+1} 期</td><td>${fmtDate(d)}</td><td>${fmtMoney(p.premium)}</td>
+          <td>${isPaid?'已繳':(isNext?'下一期':'未到期')}</td>
+        </tr>`;
+      }).join('');
+
+      return `
+      <div class="policy-card ${dueSoon?'due-soon':''}" data-id="${p.id}">
+        ${dueSoon ? `<div class="due-badge">${s.daysUntilNext<=0?'已到期':'剩 '+s.daysUntilNext+' 天'}</div>` : ''}
+        <div class="card-top">
+          <div class="rings">${ringsSVG(p, s)}</div>
+          <div class="card-info">
+            <h3>${escapeHtml(p.name)}</h3>
+            <div class="sub">${s.f.label}．每期 ${fmtMoney(p.premium)}．共 ${s.total} 期</div>
+            <div class="stat-row">
+              <span class="k">剩餘</span><span class="v">${s.done? '已繳清' : s.remainingCount+' 期（約 '+s.remainingYears.toFixed(1)+' 年）'}</span>
+            </div>
+            <div class="stat-row">
+              <span class="k">下次繳費</span><span class="v">${s.nextDate? fmtDate(s.nextDate) : '—'}</span>
+            </div>
+            <div class="stat-row">
+              <span class="k">已繳／總繳</span><span class="v">${fmtMoney(s.paidAmount)} ／ ${fmtMoney(s.totalAmount)}</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:${s.progressPct}%"></div></div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button data-act="toggleSchedule">${scheduleOpen?'收合':'繳費紀錄'}</button>
+          <button data-act="edit">編輯</button>
+          <button data-act="delete" class="danger">刪除</button>
+        </div>
+        <div class="schedule-wrap ${scheduleOpen?'open':''}">
+          <table class="schedule-table">
+            <thead><tr><th>期別</th><th>日期</th><th>金額</th><th>狀態</th></tr></thead>
+            <tbody>${scheduleRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+
+    renderSummary();
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  document.getElementById('policyList').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const card = e.target.closest('.policy-card');
+    const id = card.dataset.id;
+    const act = btn.dataset.act;
+    if (act === 'toggleSchedule'){
+      openScheduleId = (openScheduleId === id) ? null : id;
+      renderList();
+    } else if (act === 'edit'){
+      openEditModal(id);
+    } else if (act === 'delete'){
+      const p = policies.find(x=>x.id===id);
+      if (confirm(`確定要刪除「${p.name}」嗎？此動作無法復原。`)){
+        toast('刪除中…');
+        apiPost({ action:'delete', id }).then(res=>{
+          policies = res.policies || policies.filter(x=>x.id!==id);
+          renderList();
+          toast('已從 Sheet 刪除');
+        }).catch(err=>{
+          toast('刪除失敗：' + err.message);
+        });
+      }
+    }
+  });
+
+  // ---- 新增／編輯 Modal ----
+  const policyModalOverlay = document.getElementById('policyModalOverlay');
+  const policyForm = document.getElementById('policyForm');
+  const paidCountDisplay = document.getElementById('paidCountDisplay');
+  const paidOfTotal = document.getElementById('paidOfTotal');
+  let currentPaidCount = 0;
+
+  function currentMaxPeriods(){
+    const freq = document.getElementById('f_freq').value;
+    const years = parseInt(document.getElementById('f_years').value, 10) || 0;
+    return years * FREQ[freq].perYear;
+  }
+  function refreshPaidDisplay(){
+    const max = currentMaxPeriods();
+    currentPaidCount = Math.max(0, Math.min(currentPaidCount, max));
+    paidCountDisplay.textContent = currentPaidCount;
+    paidOfTotal.textContent = `／共 ${max} 期`;
+  }
+  document.getElementById('paidMinus').onclick = ()=>{ currentPaidCount--; refreshPaidDisplay(); };
+  document.getElementById('paidPlus').onclick = ()=>{ currentPaidCount++; refreshPaidDisplay(); };
+  ['f_freq','f_years'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', refreshPaidDisplay);
+  });
+  document.getElementById('f_start').addEventListener('change', ()=>{
+    if (editingId) return;
+    const start = document.getElementById('f_start').value;
+    const freq = document.getElementById('f_freq').value;
+    const years = parseInt(document.getElementById('f_years').value,10);
+    if (start && freq && years){
+      currentPaidCount = computeDefaultPaidCount({ startDate:start, frequency:freq, totalYears:years });
+      refreshPaidDisplay();
+    }
+  });
+
+  function openAddModal(){
+    editingId = null;
+    document.getElementById('policyModalTitle').textContent = '新增保單';
+    policyForm.reset();
+    document.getElementById('f_start').value = new Date().toISOString().slice(0,10);
+    currentPaidCount = 0;
+    refreshPaidDisplay();
+    policyModalOverlay.classList.add('open');
+  }
+  function openEditModal(id){
+    const p = policies.find(x=>x.id===id);
+    if (!p) return;
+    editingId = id;
+    document.getElementById('policyModalTitle').textContent = '編輯保單';
+    document.getElementById('f_name').value = p.name;
+    document.getElementById('f_start').value = p.startDate;
+    document.getElementById('f_freq').value = p.frequency;
+    document.getElementById('f_premium').value = p.premium;
+    document.getElementById('f_years').value = p.totalYears;
+    currentPaidCount = p.paidCount;
+    refreshPaidDisplay();
+    policyModalOverlay.classList.add('open');
+  }
+  function closePolicyModal(){ policyModalOverlay.classList.remove('open'); }
+
+  document.getElementById('btnAdd').onclick = openAddModal;
+  document.getElementById('policyCancel').onclick = closePolicyModal;
+  policyModalOverlay.addEventListener('click', (e)=>{ if (e.target === policyModalOverlay) closePolicyModal(); });
+
+  policyForm.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const data = {
+      name: document.getElementById('f_name').value.trim(),
+      startDate: document.getElementById('f_start').value,
+      frequency: document.getElementById('f_freq').value,
+      premium: parseFloat(document.getElementById('f_premium').value),
+      totalYears: parseInt(document.getElementById('f_years').value,10),
+      paidCount: currentPaidCount
+    };
+    if (!data.name || !data.startDate || !data.premium || !data.totalYears){ return; }
+    data.id = editingId || uid();
+    toast('儲存中…');
+    apiPost({ action:'upsert', policy: data }).then(res=>{
+      policies = res.policies || policies;
+      closePolicyModal();
+      renderList();
+      toast('已寫入 Sheet');
+      checkReminders(true);
+    }).catch(err=>{
+      toast('儲存失敗：' + err.message);
+    });
+  });
+
+  // ---- 設定 Modal ----
+  const settingsModalOverlay = document.getElementById('settingsModalOverlay');
+  document.getElementById('btnSettings').onclick = ()=>{
+    document.getElementById('f_reminderDays').value = settings.reminderDays;
+    document.getElementById('f_apiUrl').value = apiUrl;
+    document.getElementById('f_apiKey').value = apiKey;
+    setApiStatus(apiUrl ? '已設定網址（尚未確認可連線，點下方按鈕測試）' : '尚未設定');
+    updateNotifStatus();
+    settingsModalOverlay.classList.add('open');
+  };
+  document.getElementById('btnSaveApiUrl').onclick = ()=>{
+    const val = document.getElementById('f_apiUrl').value.trim();
+    const key = document.getElementById('f_apiKey').value.trim();
+    if (!val){ toast('請先貼上網址'); return; }
+    apiUrl = val;
+    apiKey = key;
+    localStorage.setItem(API_URL_KEY, apiUrl);
+    localStorage.setItem(API_KEY_KEY, apiKey);
+    setApiStatus('連線中…');
+    syncFromSheet();
+  };
+  document.getElementById('settingsClose').onclick = ()=>{
+    const newReminderDays = parseInt(document.getElementById('f_reminderDays').value,10) || 7;
+    const changed = newReminderDays !== settings.reminderDays;
+    settings.reminderDays = newReminderDays;
+    saveLocalSettings();
+    settingsModalOverlay.classList.remove('open');
+    renderList();
+    if (changed && apiUrl){
+      apiPost({ action:'settings', settings:{ reminderDays: settings.reminderDays } }).catch(()=>{});
+    }
+  };
+  settingsModalOverlay.addEventListener('click', (e)=>{ if (e.target === settingsModalOverlay) settingsModalOverlay.classList.remove('open'); });
+
+  function updateNotifStatus(){
+    const el = document.getElementById('notifStatus');
+    if (!('Notification' in window)){
+      el.textContent = '這個瀏覽器不支援通知功能。';
+      return;
+    }
+    const perm = Notification.permission;
+    el.textContent = perm === 'granted' ? '通知已啟用。' : (perm === 'denied' ? '通知被封鎖，請至瀏覽器設定手動開啟。' : '尚未啟用通知。');
+  }
+  document.getElementById('btnEnableNotif').onclick = ()=>{
+    if (!('Notification' in window)){ toast('此瀏覽器不支援通知'); return; }
+    Notification.requestPermission().then(()=>{
+      updateNotifStatus();
+      checkReminders(true);
+    });
+  };
+
+  // ---- 提醒檢查 ----
+  function checkReminders(forceNotify){
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    policies.forEach(p=>{
+      const s = policyStats(p);
+      if (s.daysUntilNext !== null && s.daysUntilNext >= 0 && s.daysUntilNext <= settings.reminderDays){
+        const notifiedKey = `notified_${p.id}_${s.paid}`;
+        if (forceNotify || !sessionStorage.getItem(notifiedKey)){
+          new Notification('儲蓄倒數帳本', {
+            body: `${p.name} 即將於 ${fmtDate(s.nextDate)} 到期繳費，金額 ${fmtMoney(p.premium)}`,
+            icon: './icon.svg'
+          });
+          sessionStorage.setItem(notifiedKey, '1');
+        }
+      }
+    });
+  }
+
+  // ---- 匯出／匯入（Sheet 為主，這裡只是輔助備份） ----
+  document.getElementById('btnExport').onclick = ()=>{
+    const blob = new Blob([JSON.stringify({ policies, settings }, null, 2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `儲蓄倒數帳本備份_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('已匯出備份');
+  };
+  document.getElementById('btnImport').onclick = ()=>{
+    document.getElementById('fileImport').click();
+  };
+  document.getElementById('fileImport').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (Array.isArray(data.policies)){
+          if (!apiUrl){ toast('請先設定 Apps Script 網址'); return; }
+          if (confirm('匯入將會覆蓋 Google Sheet 上所有保單資料，確定要繼續嗎？')){
+            toast('匯入中…');
+            apiPost({ action:'replaceAll', policies: data.policies }).then(res=>{
+              policies = res.policies || data.policies;
+              if (data.settings) settings = Object.assign(settings, data.settings);
+              saveLocalSettings();
+              renderList();
+              toast('匯入成功，已寫入 Sheet');
+            }).catch(err=>{
+              toast('匯入失敗：' + err.message);
+            });
+          }
+        } else {
+          toast('檔案格式不正確');
+        }
+      } catch(err){
+        toast('讀取失敗，請確認是正確的備份檔');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ---- Toast ----
+  let toastTimer = null;
+  function toast(msg){
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> el.classList.remove('show'), 2200);
+  }
+
+  // ---- Service worker ----
+  if ('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('./service-worker.js').then((reg)=>{
+        if ('periodicSync' in reg){
+          navigator.permissions.query({ name:'periodic-background-sync' }).then((status)=>{
+            if (status.state === 'granted'){
+              reg.periodicSync.register('check-payments', { minInterval: 24*60*60*1000 }).catch(()=>{});
+            }
+          }).catch(()=>{});
+        }
+      }).catch(()=>{});
+      navigator.serviceWorker.addEventListener('message', (event)=>{
+        if (event.data && event.data.type === 'CHECK_PAYMENTS') checkReminders(false);
+      });
+    });
+  }
+
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.visibilityState === 'visible') syncFromSheet().then(()=>checkReminders(false));
+  });
+
+  // init
+  syncFromSheet().then(()=>checkReminders(false));
+})();
+</script>
+</body>
+</html>
