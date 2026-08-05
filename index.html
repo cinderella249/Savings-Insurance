@@ -33,15 +33,6 @@
     min-height:100vh;
     padding-bottom:48px;
   }
-  body::before{
-    content:"";
-    position:fixed; inset:0;
-    background-image: repeating-linear-gradient(
-      to bottom, transparent 0 39px, var(--line) 39px 40px
-    );
-    pointer-events:none;
-    opacity:0.5;
-  }
   header{
     background:var(--ink-navy);
     color:var(--brass-light);
@@ -118,13 +109,6 @@
     padding:16px;
     position:relative;
     box-shadow:0 2px 4px rgba(43,43,40,0.05);
-  }
-  .policy-card.due-soon{border-left-color:var(--stamp);}
-  .due-badge{
-    position:absolute; top:14px; right:14px;
-    font-family:var(--mono); font-size:0.65rem; letter-spacing:0.06em;
-    color:var(--stamp); border:1px solid var(--stamp); border-radius:20px;
-    padding:2px 9px; transform:rotate(3deg);
   }
   .card-top{display:flex; gap:14px; align-items:flex-start;}
   .rings{flex:0 0 auto;}
@@ -261,6 +245,23 @@
       </div>
       <div class="field-row">
         <div class="field">
+          <label for="f_insured">被保險人</label>
+          <input type="text" id="f_insured" placeholder="例：王小明">
+        </div>
+        <div class="field">
+          <label for="f_currency">幣別</label>
+          <input type="text" id="f_currency" list="currencyList" value="TWD" placeholder="TWD">
+          <datalist id="currencyList">
+            <option value="TWD">台幣</option>
+            <option value="USD">美金</option>
+            <option value="JPY">日圓</option>
+            <option value="CNY">人民幣</option>
+            <option value="EUR">歐元</option>
+          </datalist>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
           <label for="f_start">起繳日期（第一期）</label>
           <input type="date" id="f_start" required>
         </div>
@@ -276,8 +277,8 @@
       </div>
       <div class="field-row">
         <div class="field">
-          <label for="f_premium">每期保費（元）</label>
-          <input type="number" id="f_premium" min="0" step="1" required>
+          <label for="f_premium">每期保費</label>
+          <input type="number" id="f_premium" min="0" step="0.01" required>
         </div>
         <div class="field">
           <label for="f_years">繳費年期（共幾年）</label>
@@ -321,16 +322,6 @@
       <div id="apiStatus" style="font-size:0.75rem;color:var(--sage);margin-top:8px;"></div>
     </div>
     <div class="settings-section">
-      <h3>到期繳費提醒</h3>
-      <div class="desc">開啟通知後，每次打開這個 App 都會檢查是否有保單即將到期，若在提醒天數內會跳出瀏覽器通知。由於通知是在打開 App 當下才檢查，無法保證完全沒打開 App 也收到通知，建議偶爾打開一下確認進度。</div>
-      <div class="field">
-        <label for="f_reminderDays">提前幾天提醒</label>
-        <input type="number" id="f_reminderDays" min="1" max="60" step="1" value="7">
-      </div>
-      <button type="button" class="btn-primary" id="btnEnableNotif" style="margin-top:4px;">啟用瀏覽器通知</button>
-      <div id="notifStatus" style="font-size:0.75rem;color:var(--sage);margin-top:8px;"></div>
-    </div>
-    <div class="settings-section">
       <h3>本機備份（選用）</h3>
       <div class="desc">Sheet 才是正式資料來源，這裡的匯出只是額外存一份 JSON 在電腦裡防萬一；匯入會整批覆蓋 Sheet 上的資料，請小心使用。</div>
       <div class="settings-btns">
@@ -360,24 +351,13 @@
 
   const API_URL_KEY = 'savingsPassbook.apiUrl.v1'; // 只存網址設定，不存保單資料
   const API_KEY_KEY = 'savingsPassbook.apiKey.v1'; // 密鑰
-  const LOCAL_SETTINGS_KEY = 'savingsPassbook.localSettings.v1'; // reminderDays 等本機偏好
 
   let policies = [];
-  let settings = { reminderDays: 7 };
   let editingId = null;
   let openScheduleId = null;
   let apiUrl = localStorage.getItem(API_URL_KEY) || 'https://script.google.com/macros/s/AKfycbwg8xGJLInkA-QmBe1_EoqmSCcWeqYAkZOYZEhZIZAPADVkHuY6FU-LymBW8MIXW-m-/exec';
   let apiKey = localStorage.getItem(API_KEY_KEY) || '';
   let isSyncing = false;
-
-  function loadLocalSettings(){
-    try { return Object.assign({ reminderDays:7 }, JSON.parse(localStorage.getItem(LOCAL_SETTINGS_KEY)) || {}); }
-    catch(e){ return { reminderDays:7 }; }
-  }
-  function saveLocalSettings(){
-    localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify({ reminderDays: settings.reminderDays }));
-  }
-  settings = loadLocalSettings();
 
   // ---- Google Sheet API 連線層 ----
   // 注意：呼叫 Apps Script Web App 時故意不設定 Content-Type: application/json，
@@ -421,10 +401,6 @@
     renderList();
     return apiGet('list').then(data=>{
       policies = data.policies || [];
-      if (data.settings && typeof data.settings.reminderDays === 'number'){
-        settings.reminderDays = data.settings.reminderDays;
-        saveLocalSettings();
-      }
       setApiStatus('已連線，資料同步時間 ' + new Date().toLocaleTimeString('zh-TW'));
     }).catch(err=>{
       setApiStatus('連線失敗：' + err.message, true);
@@ -461,8 +437,12 @@
   function fmtDate(d){
     return d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0');
   }
-  function fmtMoney(n){
-    return '$' + Math.round(n).toLocaleString('zh-TW');
+  function fmtMoney(n, currency){
+    currency = currency || 'TWD';
+    if (currency === 'TWD'){
+      return '$' + Math.round(n).toLocaleString('zh-TW');
+    }
+    return currency + ' ' + n.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
   }
   function daysBetween(a,b){
     const MS=86400000;
@@ -528,17 +508,20 @@
   function renderSummary(){
     const strip = document.getElementById('summaryStrip');
     if (policies.length === 0){ strip.innerHTML=''; return; }
-    let totalRemaining = 0, totalPaidAmt = 0, nearest = null;
+    let totalRemaining = 0, totalPaidAmt = 0, totalRemainingPeriods = 0;
+    const singleCurrency = new Set(policies.map(p=>p.currency||'TWD')).size === 1 ? (policies[0].currency||'TWD') : null;
     policies.forEach(p=>{
       const s = policyStats(p);
-      totalRemaining += s.remainingAmount;
-      totalPaidAmt += s.paidAmount;
-      if (s.daysUntilNext !== null && (nearest===null || s.daysUntilNext < nearest)) nearest = s.daysUntilNext;
+      if (singleCurrency){
+        totalRemaining += s.remainingAmount;
+        totalPaidAmt += s.paidAmount;
+      }
+      totalRemainingPeriods += s.remainingCount;
     });
     strip.innerHTML = `
-      <div class="summary-cell"><div class="label">已累積繳納</div><div class="value">${fmtMoney(totalPaidAmt)}</div></div>
-      <div class="summary-cell"><div class="label">尚須繳納</div><div class="value">${fmtMoney(totalRemaining)}</div></div>
-      <div class="summary-cell"><div class="label">最近繳費倒數</div><div class="value">${nearest===null?'—':nearest+' 天'}</div></div>
+      <div class="summary-cell"><div class="label">已累積繳納</div><div class="value">${singleCurrency? fmtMoney(totalPaidAmt, singleCurrency) : '幣別不同'}</div></div>
+      <div class="summary-cell"><div class="label">尚須繳納</div><div class="value">${singleCurrency? fmtMoney(totalRemaining, singleCurrency) : '幣別不同'}</div></div>
+      <div class="summary-cell"><div class="label">尚未繳總期數</div><div class="value">${totalRemainingPeriods} 期</div></div>
     `;
   }
 
@@ -570,32 +553,30 @@
 
     const sorted = [...policies].sort((a,b)=>{
       const sa = policyStats(a), sb = policyStats(b);
-      const da = sa.daysUntilNext===null? Infinity : sa.daysUntilNext;
-      const db = sb.daysUntilNext===null? Infinity : sb.daysUntilNext;
+      const da = sa.nextDate===null? Infinity : sa.nextDate.getTime();
+      const db = sb.nextDate===null? Infinity : sb.nextDate.getTime();
       return da-db;
     });
 
     list.innerHTML = sorted.map(p=>{
       const s = policyStats(p);
-      const dueSoon = s.daysUntilNext!==null && s.daysUntilNext <= settings.reminderDays;
       const scheduleOpen = openScheduleId === p.id;
       const scheduleRows = s.schedule.map((d,i)=>{
         const isPaid = i < s.paid;
         const isNext = i === s.paid;
         return `<tr class="${isPaid?'paid':''} ${isNext?'next':''}">
-          <td>第 ${i+1} 期</td><td>${fmtDate(d)}</td><td>${fmtMoney(p.premium)}</td>
+          <td>第 ${i+1} 期</td><td>${fmtDate(d)}</td><td>${fmtMoney(p.premium, p.currency)}</td>
           <td>${isPaid?'已繳':(isNext?'下一期':'未到期')}</td>
         </tr>`;
       }).join('');
 
       return `
-      <div class="policy-card ${dueSoon?'due-soon':''}" data-id="${p.id}">
-        ${dueSoon ? `<div class="due-badge">${s.daysUntilNext<=0?'已到期':'剩 '+s.daysUntilNext+' 天'}</div>` : ''}
+      <div class="policy-card" data-id="${p.id}">
         <div class="card-top">
           <div class="rings">${ringsSVG(p, s)}</div>
           <div class="card-info">
             <h3>${escapeHtml(p.name)}</h3>
-            <div class="sub">${s.f.label}．每期 ${fmtMoney(p.premium)}．共 ${s.total} 期</div>
+            <div class="sub">${p.insuredName ? '被保險人：'+escapeHtml(p.insuredName)+'．' : ''}${s.f.label}．每期 ${fmtMoney(p.premium, p.currency)}．共 ${s.total} 期</div>
             <div class="stat-row">
               <span class="k">剩餘</span><span class="v">${s.done? '已繳清' : s.remainingCount+' 期（約 '+s.remainingYears.toFixed(1)+' 年）'}</span>
             </div>
@@ -603,7 +584,7 @@
               <span class="k">下次繳費</span><span class="v">${s.nextDate? fmtDate(s.nextDate) : '—'}</span>
             </div>
             <div class="stat-row">
-              <span class="k">已繳／總繳</span><span class="v">${fmtMoney(s.paidAmount)} ／ ${fmtMoney(s.totalAmount)}</span>
+              <span class="k">已繳／總繳</span><span class="v">${fmtMoney(s.paidAmount, p.currency)} ／ ${fmtMoney(s.totalAmount, p.currency)}</span>
             </div>
             <div class="progress-track"><div class="progress-fill" style="width:${s.progressPct}%"></div></div>
           </div>
@@ -677,25 +658,28 @@
   }
   document.getElementById('paidMinus').onclick = ()=>{ currentPaidCount--; refreshPaidDisplay(); };
   document.getElementById('paidPlus').onclick = ()=>{ currentPaidCount++; refreshPaidDisplay(); };
-  ['f_freq','f_years'].forEach(id=>{
-    document.getElementById(id).addEventListener('input', refreshPaidDisplay);
-  });
-  document.getElementById('f_start').addEventListener('change', ()=>{
-    if (editingId) return;
+
+  function recomputeDefaultPaidCountIfNew(){
+    if (editingId) return; // 編輯模式下不要覆蓋使用者原本填的已繳期數
     const start = document.getElementById('f_start').value;
     const freq = document.getElementById('f_freq').value;
-    const years = parseInt(document.getElementById('f_years').value,10);
+    const years = parseInt(document.getElementById('f_years').value, 10);
     if (start && freq && years){
       currentPaidCount = computeDefaultPaidCount({ startDate:start, frequency:freq, totalYears:years });
-      refreshPaidDisplay();
     }
+    refreshPaidDisplay();
+  }
+  ['f_freq','f_years'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', recomputeDefaultPaidCountIfNew);
   });
+  document.getElementById('f_start').addEventListener('change', recomputeDefaultPaidCountIfNew);
 
   function openAddModal(){
     editingId = null;
     document.getElementById('policyModalTitle').textContent = '新增保單';
     policyForm.reset();
     document.getElementById('f_start').value = new Date().toISOString().slice(0,10);
+    document.getElementById('f_currency').value = 'TWD';
     currentPaidCount = 0;
     refreshPaidDisplay();
     policyModalOverlay.classList.add('open');
@@ -706,6 +690,8 @@
     editingId = id;
     document.getElementById('policyModalTitle').textContent = '編輯保單';
     document.getElementById('f_name').value = p.name;
+    document.getElementById('f_insured').value = p.insuredName || '';
+    document.getElementById('f_currency').value = p.currency || 'TWD';
     document.getElementById('f_start').value = p.startDate;
     document.getElementById('f_freq').value = p.frequency;
     document.getElementById('f_premium').value = p.premium;
@@ -724,6 +710,8 @@
     e.preventDefault();
     const data = {
       name: document.getElementById('f_name').value.trim(),
+      insuredName: document.getElementById('f_insured').value.trim(),
+      currency: document.getElementById('f_currency').value.trim() || 'TWD',
       startDate: document.getElementById('f_start').value,
       frequency: document.getElementById('f_freq').value,
       premium: parseFloat(document.getElementById('f_premium').value),
@@ -738,7 +726,6 @@
       closePolicyModal();
       renderList();
       toast('已寫入 Sheet');
-      checkReminders(true);
     }).catch(err=>{
       toast('儲存失敗：' + err.message);
     });
@@ -747,11 +734,9 @@
   // ---- 設定 Modal ----
   const settingsModalOverlay = document.getElementById('settingsModalOverlay');
   document.getElementById('btnSettings').onclick = ()=>{
-    document.getElementById('f_reminderDays').value = settings.reminderDays;
     document.getElementById('f_apiUrl').value = apiUrl;
     document.getElementById('f_apiKey').value = apiKey;
     setApiStatus(apiUrl ? '已設定網址（尚未確認可連線，點下方按鈕測試）' : '尚未設定');
-    updateNotifStatus();
     settingsModalOverlay.classList.add('open');
   };
   document.getElementById('btnSaveApiUrl').onclick = ()=>{
@@ -766,52 +751,9 @@
     syncFromSheet();
   };
   document.getElementById('settingsClose').onclick = ()=>{
-    const newReminderDays = parseInt(document.getElementById('f_reminderDays').value,10) || 7;
-    const changed = newReminderDays !== settings.reminderDays;
-    settings.reminderDays = newReminderDays;
-    saveLocalSettings();
     settingsModalOverlay.classList.remove('open');
-    renderList();
-    if (changed && apiUrl){
-      apiPost({ action:'settings', settings:{ reminderDays: settings.reminderDays } }).catch(()=>{});
-    }
   };
   settingsModalOverlay.addEventListener('click', (e)=>{ if (e.target === settingsModalOverlay) settingsModalOverlay.classList.remove('open'); });
-
-  function updateNotifStatus(){
-    const el = document.getElementById('notifStatus');
-    if (!('Notification' in window)){
-      el.textContent = '這個瀏覽器不支援通知功能。';
-      return;
-    }
-    const perm = Notification.permission;
-    el.textContent = perm === 'granted' ? '通知已啟用。' : (perm === 'denied' ? '通知被封鎖，請至瀏覽器設定手動開啟。' : '尚未啟用通知。');
-  }
-  document.getElementById('btnEnableNotif').onclick = ()=>{
-    if (!('Notification' in window)){ toast('此瀏覽器不支援通知'); return; }
-    Notification.requestPermission().then(()=>{
-      updateNotifStatus();
-      checkReminders(true);
-    });
-  };
-
-  // ---- 提醒檢查 ----
-  function checkReminders(forceNotify){
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    policies.forEach(p=>{
-      const s = policyStats(p);
-      if (s.daysUntilNext !== null && s.daysUntilNext >= 0 && s.daysUntilNext <= settings.reminderDays){
-        const notifiedKey = `notified_${p.id}_${s.paid}`;
-        if (forceNotify || !sessionStorage.getItem(notifiedKey)){
-          new Notification('儲蓄倒數帳本', {
-            body: `${p.name} 即將於 ${fmtDate(s.nextDate)} 到期繳費，金額 ${fmtMoney(p.premium)}`,
-            icon: './icon.svg'
-          });
-          sessionStorage.setItem(notifiedKey, '1');
-        }
-      }
-    });
-  }
 
   // ---- 匯出／匯入（Sheet 為主，這裡只是輔助備份） ----
   document.getElementById('btnExport').onclick = ()=>{
@@ -840,8 +782,6 @@
             toast('匯入中…');
             apiPost({ action:'replaceAll', policies: data.policies }).then(res=>{
               policies = res.policies || data.policies;
-              if (data.settings) settings = Object.assign(settings, data.settings);
-              saveLocalSettings();
               renderList();
               toast('匯入成功，已寫入 Sheet');
             }).catch(err=>{
@@ -872,27 +812,16 @@
   // ---- Service worker ----
   if ('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('./service-worker.js').then((reg)=>{
-        if ('periodicSync' in reg){
-          navigator.permissions.query({ name:'periodic-background-sync' }).then((status)=>{
-            if (status.state === 'granted'){
-              reg.periodicSync.register('check-payments', { minInterval: 24*60*60*1000 }).catch(()=>{});
-            }
-          }).catch(()=>{});
-        }
-      }).catch(()=>{});
-      navigator.serviceWorker.addEventListener('message', (event)=>{
-        if (event.data && event.data.type === 'CHECK_PAYMENTS') checkReminders(false);
-      });
+      navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
     });
   }
 
   document.addEventListener('visibilitychange', ()=>{
-    if (document.visibilityState === 'visible') syncFromSheet().then(()=>checkReminders(false));
+    if (document.visibilityState === 'visible') syncFromSheet();
   });
 
   // init
-  syncFromSheet().then(()=>checkReminders(false));
+  syncFromSheet();
 })();
 </script>
 </body>
