@@ -1,4 +1,4 @@
-const CACHE_NAME = 'savings-passbook-v4';
+const CACHE_NAME = 'savings-passbook-v5';
 const CORE_ASSETS = [
   './', './index.html', './manifest.json', './icon.svg',
   './icon-192.png', './icon-512.png', './icon-maskable-192.png', './icon-maskable-512.png'
@@ -20,13 +20,18 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Network-first：先試著連網抓最新版本，成功就順便更新快取；
+// 抓不到（離線、斷網）才退回用快取版本，離線時還是能開啟 App。
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request).catch(() => caches.match('./index.html'))
-      );
-    })
+    fetch(event.request)
+      .then((networkResponse) => {
+        const clone = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        return networkResponse;
+      })
+      .catch(() =>
+        caches.match(event.request).then((cached) => cached || caches.match('./index.html'))
+      )
   );
 });
