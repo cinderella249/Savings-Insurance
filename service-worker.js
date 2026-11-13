@@ -1,4 +1,4 @@
-const CACHE_NAME = 'savings-passbook-v7';
+const CACHE_NAME = 'savings-passbook-v8';
 const CORE_ASSETS = [
   './', './index.html', './manifest.json', './icon.svg',
   './icon-192.png', './icon-512.png', './icon-maskable-192.png', './icon-maskable-512.png'

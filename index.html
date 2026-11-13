@@ -203,6 +203,10 @@
     background:none; border:1px solid var(--line); color:var(--charcoal);
     padding:11px 16px; border-radius:7px; cursor:pointer; font-size:0.92rem;
   }
+  .hidden{display:none !important;}
+  .check-row{display:flex !important;align-items:center;gap:8px;color:var(--charcoal) !important;font-size:0.82rem !important;margin-bottom:8px !important;cursor:pointer;}
+  .check-row input{width:auto !important;}
+  .paid-auto-info{font-family:var(--mono);color:var(--ink-navy);background:var(--cream-2);border:1px dashed var(--line);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:0.74rem;line-height:1.7;}
   .hint{font-size:0.72rem; color:var(--sage); margin-top:-8px; margin-bottom:14px; line-height:1.5;}
   .settings-section{margin-bottom:20px;}
   .settings-section h3{font-family:var(--serif); font-size:0.95rem; color:var(--ink-navy); margin:0 0 8px;}
@@ -304,14 +308,16 @@
       </div>
       <div class="field">
         <label>已繳期數</label>
-        <div class="stepper">
+        <div class="paid-auto-info" id="paidAutoInfo"></div>
+        <label class="check-row"><input type="checkbox" id="paidManual"> 手動指定已繳期數（一般不需要）</label>
+        <div class="stepper hidden" id="paidStepper">
           <button type="button" id="paidMinus">－</button>
           <span id="paidCountDisplay">0</span>
           <button type="button" id="paidPlus">＋</button>
           <span style="font-size:0.75rem;color:var(--sage);" id="paidOfTotal">／共 0 期</span>
         </div>
       </div>
-      <p class="hint">系統會依起繳日期自動抓出到今天約繳了幾期，你可以再手動微調（例如有提前或延後繳費的情況）。</p>
+      <p class="hint">已繳期數預設會「依今天日期自動往前推算」，不用每個月更新。只有提早繳或延後繳、與日期對不上時，才需要手動指定。</p>
       <div class="modal-actions">
         <button type="button" class="btn-secondary" id="policyCancel">取消</button>
         <button type="submit" class="btn-primary">儲存</button>
@@ -506,7 +512,7 @@
     const f = FREQ[policy.frequency];
     const total = policy.totalYears * f.perYear;
     const schedule = buildSchedule(policy);
-    const paid = Math.min(policy.paidCount, total);
+    const paid = Math.min((policy.paidCount === null || policy.paidCount === undefined) ? computeDefaultPaidCount(policy) : policy.paidCount, total);
     const remainingCount = total - paid;
     const remainingYears = remainingCount / f.perYear;
     const totalAmount = policy.premium * total;
@@ -743,23 +749,32 @@
     const years = parseInt(document.getElementById('f_years').value, 10) || 0;
     return years * FREQ[freq].perYear;
   }
+  function autoPaidForForm(){
+    const start = document.getElementById('f_start').value;
+    const freq = document.getElementById('f_freq').value;
+    const years = parseInt(document.getElementById('f_years').value, 10);
+    return (start && freq && years) ? computeDefaultPaidCount({ startDate:start, frequency:freq, totalYears:years }) : 0;
+  }
   function refreshPaidDisplay(){
     const max = currentMaxPeriods();
+    const manual = document.getElementById('paidManual').checked;
     currentPaidCount = Math.max(0, Math.min(currentPaidCount, max));
+    const auto = Math.min(autoPaidForForm(), max);
+    document.getElementById('paidStepper').classList.toggle('hidden', !manual);
+    document.getElementById('paidAutoInfo').textContent = max>0
+      ? `依今天日期自動推算：已繳 ${auto} 期，剩餘 ${max-auto} 期（共 ${max} 期）`
+      : '填入起繳日期與繳費年期後，會自動推算已繳期數。';
     paidCountDisplay.textContent = currentPaidCount;
     paidOfTotal.textContent = `／共 ${max} 期`;
   }
+  document.getElementById('paidManual').addEventListener('change', ()=>{
+    if (document.getElementById('paidManual').checked) currentPaidCount = autoPaidForForm();
+    refreshPaidDisplay();
+  });
   document.getElementById('paidMinus').onclick = ()=>{ currentPaidCount--; refreshPaidDisplay(); };
   document.getElementById('paidPlus').onclick = ()=>{ currentPaidCount++; refreshPaidDisplay(); };
 
   function recomputeDefaultPaidCountIfNew(){
-    if (editingId) return; // 編輯模式下不要覆蓋使用者原本填的已繳期數
-    const start = document.getElementById('f_start').value;
-    const freq = document.getElementById('f_freq').value;
-    const years = parseInt(document.getElementById('f_years').value, 10);
-    if (start && freq && years){
-      currentPaidCount = computeDefaultPaidCount({ startDate:start, frequency:freq, totalYears:years });
-    }
     refreshPaidDisplay();
   }
   ['f_freq','f_years'].forEach(id=>{
@@ -774,6 +789,7 @@
     document.getElementById('f_start').value = new Date().toISOString().slice(0,10);
     document.getElementById('f_currency').value = 'TWD';
     currentPaidCount = 0;
+    document.getElementById('paidManual').checked = false;
     refreshPaidDisplay();
     policyModalOverlay.classList.add('open');
   }
@@ -789,7 +805,9 @@
     document.getElementById('f_freq').value = p.frequency;
     document.getElementById('f_premium').value = p.premium;
     document.getElementById('f_years').value = p.totalYears;
-    currentPaidCount = p.paidCount;
+    const manual = p.paidCount !== null && p.paidCount !== undefined;
+    document.getElementById('paidManual').checked = manual;
+    currentPaidCount = manual ? p.paidCount : 0;
     refreshPaidDisplay();
     policyModalOverlay.classList.add('open');
   }
@@ -809,7 +827,7 @@
       frequency: document.getElementById('f_freq').value,
       premium: parseFloat(document.getElementById('f_premium').value),
       totalYears: parseInt(document.getElementById('f_years').value,10),
-      paidCount: currentPaidCount
+      paidCount: document.getElementById('paidManual').checked ? currentPaidCount : null
     };
     if (!data.name || !data.startDate || !data.premium || !data.totalYears){ return; }
     data.id = editingId || uid();
