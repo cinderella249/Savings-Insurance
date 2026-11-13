@@ -204,6 +204,7 @@
     padding:11px 16px; border-radius:7px; cursor:pointer; font-size:0.92rem;
   }
   .hidden{display:none !important;}
+  .legacy-banner{background:#F7E3E0;border:1px solid var(--stamp);color:var(--stamp);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:0.78rem;line-height:1.6;}
   .check-row{display:flex !important;align-items:center;gap:8px;color:var(--charcoal) !important;font-size:0.82rem !important;margin-bottom:8px !important;cursor:pointer;}
   .check-row input{width:auto !important;}
   .paid-auto-info{font-family:var(--mono);color:var(--ink-navy);background:var(--cream-2);border:1px dashed var(--line);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:0.74rem;line-height:1.7;}
@@ -246,6 +247,7 @@
 </header>
 
 <main>
+  <div class="legacy-banner hidden" id="legacyBanner">⚠ 後端程式還是舊版：已繳期數可能不會自動前進（畫面已先用日期修正顯示）。請到 Apps Script →「管理部署作業」→ 編輯 → 版本選「新版本」→ 部署。</div>
   <div class="summary-strip" id="summaryStrip"></div>
   <div id="insuredSummary"></div>
   <div id="policyList"></div>
@@ -376,6 +378,7 @@
   const API_KEY_KEY = 'savingsPassbook.apiKey.v1'; // 密鑰
 
   let policies = [];
+  let backendVersion = '', legacyBackend = false; // 後端沒回傳版本號＝還是舊版程式
   let editingId = null;
   let openScheduleId = null;
   let apiUrl = localStorage.getItem(API_URL_KEY) || 'https://script.google.com/macros/s/AKfycbwg8xGJLInkA-QmBe1_EoqmSCcWeqYAkZOYZEhZIZAPADVkHuY6FU-LymBW8MIXW-m-/exec';
@@ -394,6 +397,7 @@
       return r.json();
     }).then(data=>{
       if (data && data.error) throw new Error(data.error);
+      backendVersion = (data && data.v) || ''; legacyBackend = !backendVersion;
       return data;
     });
   }
@@ -405,7 +409,19 @@
       return r.json();
     }).then(data=>{
       if (data && data.error) throw new Error(data.error);
+      backendVersion = (data && data.v) || ''; legacyBackend = !backendVersion;
       return data;
+    });
+  }
+
+  // 舊版後端會把「當時的已繳期數」存成固定數字。若偵測到後端是舊版：
+  // 固定數字 ≤ 依今天日期推算的期數（過期的）→ 當作自動；比推算值大（提前繳）→ 保留。
+  function fixLegacyPolicies(list){
+    if (!legacyBackend) return list;
+    return list.map(p=>{
+      if (p.paidCount === null || p.paidCount === undefined) return p;
+      if (!p.startDate || !(p.totalYears > 0)) return p;
+      return p.paidCount <= computeDefaultPaidCount(p) ? Object.assign({}, p, { paidCount: null }) : p;
     });
   }
 
@@ -423,8 +439,8 @@
     isSyncing = true;
     renderList();
     return apiGet('list').then(data=>{
-      policies = data.policies || [];
-      setApiStatus('已連線，資料同步時間 ' + new Date().toLocaleTimeString('zh-TW'));
+      policies = fixLegacyPolicies(data.policies || []);
+      setApiStatus('已連線，資料同步時間 ' + new Date().toLocaleTimeString('zh-TW') + (legacyBackend ? '　⚠ 後端程式是舊版，請重新部署新版本' : '　（後端版本 ' + backendVersion + '）'), legacyBackend);
       return loadExchangeRatesForPolicies();
     }).catch(err=>{
       setApiStatus('連線失敗：' + err.message, true);
@@ -623,6 +639,7 @@
   }
 
   function renderList(){
+    document.getElementById('legacyBanner').classList.toggle('hidden', !legacyBackend);
     const list = document.getElementById('policyList');
     const empty = document.getElementById('emptyState');
     if (!apiUrl){
@@ -727,7 +744,7 @@
       if (confirm(`確定要刪除「${p.name}」嗎？此動作無法復原。`)){
         toast('刪除中…');
         apiPost({ action:'delete', id }).then(res=>{
-          policies = res.policies || policies.filter(x=>x.id!==id);
+          policies = fixLegacyPolicies(res.policies || policies.filter(x=>x.id!==id));
           renderList();
           toast('已從 Sheet 刪除');
         }).catch(err=>{
@@ -833,7 +850,7 @@
     data.id = editingId || uid();
     toast('儲存中…');
     apiPost({ action:'upsert', policy: data }).then(res=>{
-      policies = res.policies || policies;
+      policies = fixLegacyPolicies(res.policies || policies);
       closePolicyModal();
       renderList();
       toast('已寫入 Sheet');
@@ -893,7 +910,7 @@
           if (confirm('匯入將會覆蓋 Google Sheet 上所有保單資料，確定要繼續嗎？')){
             toast('匯入中…');
             apiPost({ action:'replaceAll', policies: data.policies }).then(res=>{
-              policies = res.policies || data.policies;
+              policies = fixLegacyPolicies(res.policies || data.policies);
               renderList();
               toast('匯入成功，已寫入 Sheet');
               loadExchangeRatesForPolicies().then(renderList);
